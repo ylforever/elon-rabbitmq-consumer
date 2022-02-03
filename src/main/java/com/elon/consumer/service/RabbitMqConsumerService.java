@@ -67,7 +67,6 @@ public class RabbitMqConsumerService {
             
             String queueName = channel.queueDeclare().getQueue();
             LOGGER.info("Get queue name:{}", queueName);
-
             channel.queueBind(queueName, EXCHANGE_NAME, "");
 
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
