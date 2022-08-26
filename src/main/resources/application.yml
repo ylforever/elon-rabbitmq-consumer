@@ -1,7 +1,7 @@
 server:
   servlet:
     context-path: /elon-rabbitmq-consumer
-  port: 20000
+  port: 20001
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain

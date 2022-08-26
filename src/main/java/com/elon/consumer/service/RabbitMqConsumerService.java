@@ -3,13 +3,10 @@ package com.elon.consumer.service;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeoutException;
+import java.util.List;
 
 /**
  * RabbitMq消费者服务类
@@ -22,14 +19,16 @@ public class RabbitMqConsumerService {
 
     private final static String QUEUE_NAME = "elon_queue";
 
-    private final static String EXCHANGE_NAME = "elon_exchange";
+    private final static String EXCHANGE_FANOUT_NAME = "exchange_fanout_name";
+
+    private final static String EXCHANGE_TOPIC_NAME = "exchange_topic_name";
 
     /**
      * 消费消息
      */
     public void consumeMessage() {
         ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("192.168.43.134");
+        factory.setHost("192.168.5.128");
         factory.setPort(5672);
         factory.setUsername("yzy");
         factory.setPassword("yzy614114");
@@ -39,12 +38,14 @@ public class RabbitMqConsumerService {
             Channel channel = connection.createChannel();
             channel.queueDeclare(QUEUE_NAME, false, false, false, null);
 
-            DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-                LOGGER.info("Receive message from queue:{}", message);
-            };
+            // 一次只预取一个消息处理
+            int prefetchCount = 1;
+            channel.basicQos(prefetchCount);
 
-            channel.basicConsume(QUEUE_NAME, true, deliverCallback, tag->{});
+            // 不自动确认，在消费完成后主动确认.
+            boolean autoAck = false;
+            channel.basicConsume(QUEUE_NAME, autoAck, new MQMessageHandler(channel), tag -> {
+            });
         } catch (Exception e) {
             LOGGER.error("Consume message exception.", e);
         }
@@ -53,9 +54,9 @@ public class RabbitMqConsumerService {
     /**
      * 消费交换器转发的消息
      */
-    public void consumeMessageFromExchange(){
+    public void consumeMessageFromFanoutExchange() {
         ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("192.168.43.134");
+        factory.setHost("192.168.5.128");
         factory.setPort(5672);
         factory.setUsername("yzy");
         factory.setPassword("yzy614114");
@@ -63,18 +64,37 @@ public class RabbitMqConsumerService {
         try {
             Connection connection = factory.newConnection();
             Channel channel = connection.createChannel();
-            channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
-            
+            channel.exchangeDeclare(EXCHANGE_FANOUT_NAME, "fanout");
+
             String queueName = channel.queueDeclare().getQueue();
             LOGGER.info("Get queue name:{}", queueName);
-            channel.queueBind(queueName, EXCHANGE_NAME, "");
+            channel.queueBind(queueName, EXCHANGE_FANOUT_NAME, "");
+            channel.basicConsume(queueName, false, new MQMessageHandler(channel), tag -> {
+            });
+        } catch (Exception e) {
+            LOGGER.error("Consume message exception.", e);
+        }
+    }
 
-            DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-                LOGGER.info("Receive message from binding exchange:{}", message);
-            };
+    public void consumeMessageFromTopicExchange(List<String> bindKeys) {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("192.168.5.128");
+        factory.setPort(5672);
+        factory.setUsername("yzy");
+        factory.setPassword("yzy614114");
 
-            channel.basicConsume(queueName, true, deliverCallback, tag->{});
+        try {
+            Connection connection = factory.newConnection();
+            Channel channel = connection.createChannel();
+            channel.exchangeDeclare(EXCHANGE_TOPIC_NAME, "topic");
+            String queueName = channel.queueDeclare().getQueue();
+
+            for (String bindKey : bindKeys) {
+                channel.queueBind(queueName, EXCHANGE_TOPIC_NAME, bindKey);
+            }
+
+            channel.basicConsume(queueName, false, new MQMessageHandler(channel), tag -> {
+            });
         } catch (Exception e) {
             LOGGER.error("Consume message exception.", e);
         }

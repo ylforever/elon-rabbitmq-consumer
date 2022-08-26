@@ -7,6 +7,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * RabbitMQ 消费者引用启动类
  *
@@ -19,8 +22,13 @@ public class ElonRabbitMqConsumerApplication {
     public static void main(String[] args) {
         SpringApplication.run(ElonRabbitMqConsumerApplication.class);
         RabbitMqConsumerService consumerService = new RabbitMqConsumerService();
-//        consumerService.consumeMessage();
-        consumerService.consumeMessageFromExchange();
+        consumerService.consumeMessage();
+        consumerService.consumeMessageFromFanoutExchange();
+
+        List<String> bindKeys = new ArrayList<>();
+        bindKeys.add("ab.#");
+        consumerService.consumeMessageFromTopicExchange(bindKeys);
+
         LOGGER.info("Start up rabbitmq consumer success.");
     }
 }
